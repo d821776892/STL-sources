@@ -1,8 +1,10 @@
 #include <iostream>
 #include <vector>
 #include <limits.h>
+#include <type_traits>
 using namespace std;
 
+// allocator
 namespace dyj01{
     template<class T>
     inline T* _allocate(ptrdiff_t size, T* t){
@@ -34,6 +36,20 @@ namespace dyj01{
         ptr->~T();
     }
 
+    template<class ForwardIterator, class T>
+    inline void _destroy(ForwardIterator first, ForwardIterator last, T*){
+        //using trivial_destructor = typename type_trait<T>::has_trivial_destructor;
+
+    }
+
+    template<class ForwardIterator>
+    inline void _destroy_aux(ForwardIterator first, ForwardIterator last, __false_type){
+        for (; first < last; first++){
+            
+        }
+        
+    }
+
     template <class T>
     class allocator{
     public:
@@ -60,6 +76,7 @@ namespace dyj01{
 
         void construct(pointer p, const T& value) { _construct(p, value); }
 
+        //第一版本
         void destroy(pointer p) { _destroy(p); }
 
         pointer address(reference x) { return (pointer)&x; }
@@ -71,11 +88,108 @@ namespace dyj01{
     };
 }
 
-int main(){
-    int ia[5] = {0,1,2,3,4};
-    unsigned int i;
-    vector<int, dyj01::allocator<int> >iv(ia, ia + 5);
-    for (auto temp : iv){
-        cout << temp << " ";
+// alloc
+namespace dyj02{
+    template <int inst>
+    class __malloc_alloc_template {
+    private:
+        //处理异常情况
+        static void *oom_malloc(size_t);
+        static void *oom_realloc(void *, size_t);
+        static void (* __malloc_alloc_oom_handler)();
+
+    public:
+        static void *allocate(size_t n){
+            void *result = malloc(n);
+            if (nullptr == result) result = oom_malloc(n);
+            return result;
+        }
+
+        static void deallocate(void *p,size_t){ free(p); }
+
+        static void* reallocate(void *p, size_t, size_t new_sz){
+            void *result = realloc(p, new_sz);
+            if (nullptr == result) result = oom_realloc(p, new_sz);
+            return result;
+        }
+
+        //设置自己的out-of-memory handler
+        static void (* set_malloc_handler(void (*f)()))(){
+            void (* old)() = __malloc_alloc_oom_handler;
+            __malloc_alloc_oom_handler = f;
+            return old;
+        }
+    };
+    
+    template<int inst>
+    void (* __malloc_alloc_template<inst>::__malloc_alloc_oom_handler)() = 0;
+
+    template<int inst>
+    void * __malloc_alloc_template<inst>::oom_malloc(size_t n){
+        void (* my_malloc_handler)();
+        void *result;
+
+        while (1) {
+            my_malloc_handler = __malloc_alloc_oom_handler;
+            if (nullptr == my_malloc_handler) { __throw_bad_alloc; }
+            (*my_malloc_handler)();
+            result = malloc(n);
+            if (result) return(result);
+        }
     }
+
+    template<int inst>
+    void * __malloc_alloc_template<inst>::oom_realloc(void *p, size_t n){
+        void (* my_malloc_handler)();
+        void *result;
+
+        while (1) {
+            my_malloc_handler = __malloc_alloc_oom_handler;
+            if (nullptr == my_malloc_handler) { __throw_bad_alloc; }
+            (*my_malloc_handler)();
+            result = realloc(p, n);
+            if (result) return(result);
+        }
+    }
+    
+}
+
+namespace dyj03{
+    template<class ForwardIterator, class Size, class T, bool condition>
+    inline ForwardIterator __my_uninitialized_fill_n_aux
+        (ForwardIterator first, Size n, const T& x){
+        return fill_n(first, n, x);
+    }
+
+    template<class ForwardIterator, class Size, class T>
+    inline ForwardIterator __my_uninitialized_fill_n_aux<ForwardIterator, Size, T, false>
+        (ForwardIterator first, Size n, const T& x){
+        ForwardIterator cur = first;
+        for (; n > 0; cur++)
+        {
+            _Construct(&*cur, x);
+        }
+        return cur;
+    }
+
+    template<class ForwardIterator, class Size, class T, class T1>
+    inline ForwardIterator __my_uninitialized_fill_n(ForwardIterator first, Size n, const T& x, T1*){
+        // typedef typename type_traits<T1>::is_POD_type is_POD;
+        return __my_uninitialized_fill_n_aux(first, n, x, is_pod<T1>::value);
+    }
+
+    template<class ForwardIterator, class Size, class T>
+    inline ForwardIterator my_uninitialized_fill_n(ForwardIterator first, Size n, const T& x){
+        return __my_uninitialized_fill_n(first, n, x, first);
+    }
+}
+int main(){
+    // int ia[5] = {0,1,2,3,4};
+    // unsigned int i;
+    // vector<int, dyj01::allocator<int> >iv(ia, ia + 5);
+    // for (auto temp : iv){
+    //     cout << temp << " ";
+    // }
+    vector<int> vec_int(5);
+    dyj03::my_uninitialized_fill_n(vec_int.begin(), 5, 20);
 }
