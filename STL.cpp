@@ -2,6 +2,7 @@
 #include <vector>
 #include <limits.h>
 #include <type_traits>
+#include <algorithm>
 using namespace std;
 
 // allocator
@@ -154,6 +155,7 @@ namespace dyj02{
     
 }
 
+/*
 namespace dyj03{
     template<class ForwardIterator, class Size, class T, bool condition>
     inline ForwardIterator __my_uninitialized_fill_n_aux
@@ -183,6 +185,121 @@ namespace dyj03{
         return __my_uninitialized_fill_n(first, n, x, first);
     }
 }
+*/
+
+namespace dyj04 // 手工實現List容器
+{
+    template <typename T>
+    class List
+    {
+    public:
+
+        List() : _end(nullptr), _front(nullptr), _size(0) {}
+        void insert_front(T value);
+        void insert_back(T value);
+        void display(std::ostream& os = std::cout);
+        size_t size() const { return _size; }
+    private:
+        struct ListItem
+        {
+            ListItem(T value) : _value(value), _next(nullptr) {}
+            T value() const { return _value; }
+            ListItem* next() const { return _next; }
+
+            T _value;
+            ListItem* _next;
+            template <typename U>
+            bool operator!=(U n) { return _value != n; }
+        };
+
+        ListItem* _end;
+        ListItem* _front;
+        int _size;
+        
+    public:
+        struct ListIter
+        {
+            ListItem* ptr;
+            ListIter(ListItem* p = 0) : ptr(p) { }
+            ListItem operator*() const { return *ptr; }
+            ListItem* operator->() const { return ptr; }
+            ListIter& operator++() { ptr = ptr->next(); return ptr; }
+            ListIter operator++(int) { ListIter temp = *this; ++*this; return temp; }
+            bool operator==(const ListIter& i) const { return ptr == i.ptr; }
+            bool operator!=(const ListIter& i) const { return ptr != i.ptr; }
+        };
+
+        ListItem* begin() { return _front; }
+        ListItem* end() { return _end;}
+    };
+
+    template<typename T>
+    void List<T>::insert_back(T value)
+    {
+        struct ListItem* temp = new ListItem(value);        
+        if (_end == nullptr && _front == nullptr)
+        {
+            _end = temp;
+            _front = temp;
+            ++_size;
+        }
+        else
+        {
+            _end->_next = temp;
+            _end = temp;
+            ++_size;
+        }  
+    }
+
+    template<typename T>
+    void List<T>::insert_front(T value)
+    {
+        struct ListItem* temp = new ListItem(value);
+        if (_end == nullptr && _front == nullptr)
+        {
+            _end = temp;
+            _front = temp;
+            ++_size;
+        }
+        else
+        {
+            temp->_next = _front;
+            _front = temp;
+            ++_size;
+        }
+    }
+
+    template<typename T>
+    void List<T>::display(std::ostream& os) // 模版默认参数必须在第一次声明的时候指出，后序无需再出现
+    {
+        struct ListItem* temp = _front;
+        for (int i = 1; i <= size(); i++)
+        {
+            if (i == size())
+            {
+                os << temp->value() << "]" << endl;
+            }
+            else
+            {
+                if (i == 1)
+                {
+                    os << '[' << temp->value() << ',';
+                }
+                else
+                {
+                    os << temp->value() << ",";
+                }
+                temp = temp->_next;
+            }
+        }
+
+        // os << temp->_next << endl;
+        // os << temp->_next->_next << endl;
+        // os << temp->_next->_next->_next << endl;
+        // os << temp->_value << endl;
+    }
+} // namespace dyj04
+
 int main(){
     // int ia[5] = {0,1,2,3,4};
     // unsigned int i;
@@ -190,6 +307,25 @@ int main(){
     // for (auto temp : iv){
     //     cout << temp << " ";
     // }
-    vector<int> vec_int(5);
-    dyj03::my_uninitialized_fill_n(vec_int.begin(), 5, 20);
+    // vector<int> vec_int(5);
+    // dyj03::my_uninitialized_fill_n(vec_int.begin(), 5, 20);
+    dyj04::List<int> list;
+    list.insert_back(123);
+    list.insert_back(456);
+    list.insert_back(789);
+    list.insert_back(999);
+    // cout << list.size() << endl;
+    list.display();
+    dyj04::List<int>::ListIter begin(list.begin());
+    dyj04::List<int>::ListIter end(list.end());
+    dyj04::List<int>::ListIter iter;
+    iter = std::find(begin, end, 123);
+    if (iter == end)
+    {
+        cout << "not found" << endl;
+    }
+    else
+    {
+        cout << "found:" << iter->value() << endl;
+    }
 }
